@@ -14,7 +14,10 @@ proc isRoot(): bool {.inline.} =
 
 
 proc getSimpleProgramsPath(): string {.inline.} =
-  getHomeDir() & "unnixer/simple_programs.nix"
+  result = getEnv("UNNIX_SIMPLE_PROGRAMS")
+  if result == "":
+    echo "You may have forgotten to set the UNNIX_SIMPLE_PROGRAMS environment variable"
+    quit(0)
 
 
 proc loadSimplePrograms(): HashSet[string] =

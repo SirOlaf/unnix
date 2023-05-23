@@ -29,7 +29,7 @@ proc loadSimplePrograms(): HashSet[string] =
       progSlice = contents[progStart+1 ..< progEnd]
     progSlice.splitLines().mapIt(it.strip()).filterIt(it.len() > 0).sorted().toHashSet()
   else:
-    [].toHashSet()
+    initHashSet[string]()
 
 proc buildSimpleProgramFile(progs: HashSet[string]): string =
   const

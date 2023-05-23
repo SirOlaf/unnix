@@ -21,12 +21,15 @@ proc getSimpleProgramsPath(): string {.inline.} =
 
 
 proc loadSimplePrograms(): HashSet[string] =
-  let
-    contents = readFile(getSimpleProgramsPath())
-    progStart = contents.find("[")
-    progEnd = contents.find("];")
-    progSlice = contents[progStart+1 ..< progEnd]
-  progSlice.splitLines().mapIt(it.strip()).filterIt(it.len() > 0).sorted().toHashSet()
+  if fileExists(getSimpleProgramsPath()):
+    let
+      contents = readFile(getSimpleProgramsPath())
+      progStart = contents.find("[")
+      progEnd = contents.find("];")
+      progSlice = contents[progStart+1 ..< progEnd]
+    progSlice.splitLines().mapIt(it.strip()).filterIt(it.len() > 0).sorted().toHashSet()
+  else:
+    [].toHashSet()
 
 proc buildSimpleProgramFile(progs: HashSet[string]): string =
   const

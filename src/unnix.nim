@@ -44,6 +44,7 @@ proc buildSimpleProgramFile(progs: HashSet[string]): string =
   result &= "  ];\n}"
 
 proc writeSimpleProgramFile(progs: HashSet[string]) {.inline.} =
+  # TODO: Create parent dirs if needed
   writeFile(getSimpleProgramsPath(), progs.buildSimpleProgramFile())
 
 

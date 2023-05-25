@@ -16,6 +16,9 @@ import elastic_matchers
 proc isRoot(): bool {.inline.} =
   getuid() == 0
 
+proc isUnfree(package: NixSearchRespPackage): bool {.inline.} =
+  package.packageLicense.anyIt(it.fullName == "Unfree")
+
 
 proc getSimpleProgramsPath(): string {.inline.} =
   result = getEnv("UNNIX_SIMPLE_PROGRAMS")
@@ -58,33 +61,63 @@ proc doNixosRebuild() =
   discard os.execShellCmd("sudo nixos-rebuild switch")
 
 proc presentPackage(package: NixSearchRespPackage, packageIdx: int, installedPackages: HashSet[string]) =
-  stdout.write "  ", packageIdx, " ", package.packagePname
-  if package.packagePname in installedPackages:
+  stdout.write "  ", packageIdx, " ", package.packageAttrName, " (", package.packagePname, ")"
+  if package.packageLicense.anyIt(it.fullName == "Unfree"):
+    stdout.write " {UNFREE}"
+  if package.packageAttrName in installedPackages:
     stdout.write " [Installed]"
   echo ""
   echo "    ", package.packageDescription
 
-proc doInstall(progName: string) =
-  var curProgs = loadSimplePrograms()
-
-  var client = newNixSearchClient()
-  let webPackages = client.queryPackages(
-    NixSearchQuery(
-      maxResults : 10,
-      name : some MatchName(name : progName)
-    )
-  )
-
-  var idx = webPackages.len()
-  for package in webPackages:
-    presentPackage(package, idx, curProgs)
+proc doPackageSelect(packages: seq[NixSearchRespPackage], highlightInstalled: bool, installedPackages=none(HashSet[string])): seq[NixSearchRespPackage] =
+  var idx = packages.len()
+  for package in packages.reversed():
+    presentPackage(package, idx, installedPackages.get(initHashSet[string]()))
     dec idx
 
   stdout.write ":: "
   # TODO: Allow stuff like ranges and handle bad input so we don't just crash
   let packIdx = stdin.readLine().parseInt()
+  result.add(packages[packIdx - 1])
 
-  curProgs.incl(webPackages[webPackages.len() - packIdx].packagePname)
+
+template pkgWrapNix(installedPkgs, body: untyped): untyped =
+  var client = newNixSearchClient()
+  let webPackages = client.queryPackages(
+    NixSearchQuery(
+      maxResults : 10,
+      search : some MatchSearch(search : progName)
+    )
+  )
+
+  let selectedPackages {.inject, used.} = doPackageSelect(
+    packages = webPackages,
+    highlightInstalled = true,
+    installedPackages = installedPkgs,
+  )
+  body
+
+template wrapUnfreeNixCommand(package: NixSearchRespPackage, body: untyped) =
+  let pkg = package
+  if pkg.isUnfree():
+    stdout.write(pkg.packageAttrName & " is unfree. Do you want to let nix continue? (y/n) ")
+    var resp = stdin.readLine().strip()
+    while resp[0] notin { 'y', 'n' }:
+      resp = stdin.readLine().strip()
+    if resp[0] == 'n':
+      echo "Cancelled " & pkg.packageAttrName & ""
+      return
+    else:
+      echo "Continuing..."
+  body
+
+
+proc doInstall(progName: string) =
+  var curProgs = loadSimplePrograms()
+
+  pkgWrapNix(some curProgs):
+    for package in selectedPackages:
+      curProgs.incl(package.packageAttrName)
   curProgs.writeSimpleProgramFile()
   doNixosRebuild()
 
@@ -99,6 +132,23 @@ proc doUninstall(progName: string) =
   curProgs.writeSimpleProgramFile()
   doNixosRebuild()
 
+proc doShell(progName: string) =
+  pkgWrapNix(none HashSet[string]):
+    for package in selectedPackages:
+      wrapUnfreeNixCommand(package):
+        if package.isUnfree():
+          discard os.execShellCmd("NIXPKGS_ALLOW_UNFREE=1 nix shell --impure nixpkgs#" & package.packageAttrName)
+        else:
+          discard os.execShellCmd("nix shell nixpkgs#" & package.packageAttrName)
+
+proc doRun(progName: string) =
+  pkgWrapNix(none HashSet[string]):
+    doAssert selectedPackages.len() == 1
+    wrapUnfreeNixCommand(selectedPackages[0]):
+      if selectedPackages[0].isUnfree():
+        discard os.execShellCmd("NIXPKGS_ALLOW_UNFREE=1 nix run --impure nixpkgs#" & selectedPackages[0].packageAttrName)
+      else:
+        discard os.execShellCmd("nix run nixpkgs#" & selectedPackages[0].packageAttrName)
 
 
 proc main() =
@@ -113,6 +163,10 @@ proc main() =
     doInstall(paramStr(2).toLower())
   of "uninstall":
     doUninstall(paramStr(2).toLower())
+  of "shell":
+    doShell(paramStr(2).toLower())
+  of "run":
+    doRun(paramStr(2).toLower())
 
 
 when isMainModule:

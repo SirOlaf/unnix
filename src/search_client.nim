@@ -43,16 +43,17 @@ type
     maxResults*: int
     channel*: Option[NixChannel]
     name*: Option[MatchName]
+    search*: Option[MatchSearch]
 
   NixSearchQueryJson = object
     `from`, size: int
-    sort: seq[Table[string, string]]
-    query: Table[string, Table[string, RawJson]]
+    sort: seq[OrderedTable[string, string]]
+    query: OrderedTable[string, OrderedTable[string, RawJson]]
 
 
-  NixSearchRespLicense = object
-    url: string
-    fullName: string
+  NixSearchRespLicense* = object
+    url*: string
+    fullName*: string
 
   NixSearchRespPackage* = object
     `type`*: string
@@ -76,7 +77,6 @@ type
   NixSearchResp = object
     took: int
     timedOut: bool
-    #hits: Table[string, seq[Table[string, RawJson]]]
     hits: tuple[hits: seq[NixSearchRespHit]]
 
 
@@ -130,15 +130,17 @@ proc prepQuery(query: NixSearchQuery): NixSearchQueryJson =
     "_score": "desc",
     "package_attr_name": "desc",
     "package_pversion": "desc",
-  }.toTable()]
+  }.toOrderedTable()]
 
   var must = newSeq[RawJson]()
   if query.name.isSome():
     must.add(query.name.toJson().RawJson)
+  if query.search.isSome():
+    must.add(query.search.toJson().RawJson)
 
   result.query["bool"] = {
     "must": must.toJson().RawJson
-  }.toTable()
+  }.toOrderedTable()
 
 proc queryPackages*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchRespPackage] =
   let preppedQuery = query.prepQuery().toJson()
@@ -163,13 +165,13 @@ when isMainModule:
   let client = newNixSearchClient()
   let query = NixSearchQuery(
     maxResults : 50,
-    name : some MatchName(name : "firefox")
+    search : some MatchSearch(search : "python")
   )
 
   let packages = client.queryPackages(query)
   var i = packages.len()
   for package in packages:
-    echo "  ", i, " ", package.packagePname
+    echo "  ", i, " ", package.packageAttrName
     echo "    ", package.packageDescription
     dec i
 

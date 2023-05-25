@@ -1,5 +1,6 @@
 import std/[
   algorithm,
+  options,
   os,
   strutils,
   sequtils,
@@ -7,6 +8,9 @@ import std/[
 
   posix,
 ]
+
+import search_client
+import elastic_matchers
 
 
 proc isRoot(): bool {.inline.} =
@@ -53,13 +57,34 @@ proc doNixosRebuild() =
   # TODO: Return error code?
   discard os.execShellCmd("sudo nixos-rebuild switch")
 
+proc presentPackage(package: NixSearchRespPackage, packageIdx: int, installedPackages: HashSet[string]) =
+  stdout.write "  ", packageIdx, " ", package.packagePname
+  if package.packagePname in installedPackages:
+    stdout.write " [Installed]"
+  echo ""
+  echo "    ", package.packageDescription
+
 proc doInstall(progName: string) =
   var curProgs = loadSimplePrograms()
-  if progName in curProgs:
-    echo progName & " is already installed!"
-    return
 
-  curProgs.incl(progName)
+  var client = newNixSearchClient()
+  let webPackages = client.queryPackages(
+    NixSearchQuery(
+      maxResults : 10,
+      name : some MatchName(name : progName)
+    )
+  )
+
+  var idx = webPackages.len()
+  for package in webPackages:
+    presentPackage(package, idx, curProgs)
+    dec idx
+
+  stdout.write ":: "
+  # TODO: Allow stuff like ranges and handle bad input so we don't just crash
+  let packIdx = stdin.readLine().parseInt()
+
+  curProgs.incl(webPackages[webPackages.len() - packIdx].packagePname)
   curProgs.writeSimpleProgramFile()
   doNixosRebuild()
 

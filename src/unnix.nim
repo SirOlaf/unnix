@@ -60,7 +60,7 @@ proc doNixosRebuild() =
   discard os.execShellCmd("sudo nixos-rebuild switch")
 
 proc presentPackage(package: NixSearchRespPackage, packageIdx: int, installedPackages: HashSet[string]) =
-  stdout.write "  ", packageIdx, " ", package.packageAttrName, " (", package.packagePname, ")"
+  stdout.write "  ", packageIdx, " ", package.packageAttrName, " (", package.packagePname, "; ", package.packagePversion, ")"
   if package.packageLicense.anyIt(it.fullName == "Unfree"):
     stdout.write " {UNFREE}"
   if package.packageAttrName in installedPackages:
@@ -189,7 +189,7 @@ proc run(progName: seq[string]) =
 
 proc search(progName: seq[string]) =
   doAssert progName.len() == 1
-  let installedProgs = loadSimplePrograms()
+  #let installedProgs = loadSimplePrograms()
   var client = newNixSearchClient()
   let webPackages = client.queryPackages(
     NixSearchQuery(
@@ -200,7 +200,7 @@ proc search(progName: seq[string]) =
   presentPackages(
     packages = webPackages,
     highlightInstalled = true, 
-    installedPackages = some installedProgs
+    #installedPackages = some installedProgs
   )
 
 

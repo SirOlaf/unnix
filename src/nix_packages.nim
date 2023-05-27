@@ -10,6 +10,8 @@ import jsony
 import search_client
 import elastic_matchers
 
+export newNixSearchClient, NixSearchQuery
+
 
 type
   NixSearchRespLicense* = object
@@ -36,7 +38,7 @@ proc queryPackages*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearch
   let preppedQuery = query.prepQuery().toJson()
 
   var headers: HttpHeaders
-  headers["Authorization"] = encodeBasicAuth(elasticSearchUsername, elasticSearchPassword)
+  headers["Authorization"] = getDefaultBasicAuth()
   headers["Content-type"] = "application/json"
   let resp = post(
     self.makeBackendSearchUri(query.channel.get("unstable".NixChannel)),

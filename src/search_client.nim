@@ -19,8 +19,8 @@ import elastic_matchers
 
 
 const
-  elasticSearchUsername* = "aWVSALXpZv"
-  elasticSearchPassword* = "X8gPHnzL52wFEekuxsfQ9cSh"
+  elasticSearchUsername = "aWVSALXpZv"
+  elasticSearchPassword = "X8gPHnzL52wFEekuxsfQ9cSh"
   baseBackendUri = "https://search.nixos.org/backend/"
   backendAliasUri = baseBackendUri & "_aliases"
 
@@ -81,9 +81,13 @@ proc `$`(x: NixChannel): string {.borrow.}
 proc encodeBasicAuth*(username, password: string): string {.inline.} =
   "Basic " & base64.encode(username & ":" & password)
 
+proc getDefaultBasicAuth*(): string {.inline.} =
+  encodeBasicAuth(elasticSearchUsername, elasticSearchPassword)
+
+
 proc fetchNixosSearchAliases(): HashSet[string] =
   var headers: HttpHeaders
-  headers["Authorization"] = encodeBasicAuth(elasticSearchUsername, elasticSearchPassword)
+  headers["Authorization"] = getDefaultBasicAuth()
   let resp = get(backendAliasUri, headers)
   for _, data in resp.body.fromJson(ElasticAliases):
     if data.aliases.len() > 0:

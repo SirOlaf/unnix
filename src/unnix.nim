@@ -8,8 +8,8 @@ import std/[
   posix,
 ]
 
-import search_client
 import nix_packages
+import nix_options
 import elastic_matchers
 
 
@@ -76,6 +76,19 @@ proc presentPackages(packages: seq[NixSearchRespPackage], highlightInstalled: bo
   for package in packages.reversed():
     presentPackage(package, idx, installedPackages.get(initHashSet[string]()))
     dec idx
+
+
+proc presentOption(option: NixSearchRespOption, optionIdx: int) =
+  stdout.write "  ", optionIdx, " ", option.optionName, ": ", option.optionType, " (default=", option.optionDefault, ")"
+  echo ""
+  echo "    ", option.optionDescription
+
+proc presentOptions(options: seq[NixSearchRespOption]) =
+  var idx = options.len()
+  for option in options.reversed():
+    presentOption(option, idx)
+    dec idx
+
 
 proc doPackageSelect(packages: seq[NixSearchRespPackage], highlightInstalled: bool, installedPackages=none(HashSet[string])): seq[NixSearchRespPackage] =
   presentPackages(packages, highlightInstalled, installedPackages)
@@ -194,21 +207,34 @@ proc run(progName: seq[string]) =
       else:
         discard os.execShellCmd("nix run nixpkgs#" & selectedPackages[0].packageAttrName)
 
-proc search(progName: seq[string]) =
+proc search(progName: seq[string], options=false) =
   doAssert progName.len() == 1
-  let installedProgs = loadSimplePrograms(requireProgfile=false)
   var client = newNixSearchClient()
-  let webPackages = client.queryPackages(
-    NixSearchQuery(
-      maxResults : 10,
-      search : some MatchSearch(search : progName[0])
+  if options:
+    let webOptions = client.queryOptions(
+      NixSearchQuery(
+        maxResults : 10,
+        search : some MatchSearch(search : progName[0]),
+        kind : SearchKind.option
+      )
     )
-  )
-  presentPackages(
-    packages = webPackages,
-    highlightInstalled = true, 
-    installedPackages = some installedProgs
-  )
+    presentOptions(
+      options = webOptions
+    )
+  else:
+    let installedProgs = loadSimplePrograms(requireProgfile=false)
+    let webPackages = client.queryPackages(
+      NixSearchQuery(
+        maxResults : 10,
+        search : some MatchSearch(search : progName[0]),
+        kind : SearchKind.package
+      )
+    )
+    presentPackages(
+      packages = webPackages,
+      highlightInstalled = true, 
+      installedPackages = some installedProgs
+    )
 
 
 when isMainModule:

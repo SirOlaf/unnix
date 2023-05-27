@@ -133,6 +133,7 @@ proc install(progNames: seq[string], multi=false) =
         break
       curProgs.incl(progName)
   else:
+    doAssert progNames.len() == 1
     let progName = progNames[0]
 
     pkgWrapNix(some curProgs):

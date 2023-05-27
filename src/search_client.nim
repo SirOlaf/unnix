@@ -19,8 +19,8 @@ import elastic_matchers
 
 
 const
-  elasticSearchUsername = "aWVSALXpZv"
-  elasticSearchPassword = "X8gPHnzL52wFEekuxsfQ9cSh"
+  elasticSearchUsername* = "aWVSALXpZv"
+  elasticSearchPassword* = "X8gPHnzL52wFEekuxsfQ9cSh"
   baseBackendUri = "https://search.nixos.org/backend/"
   backendAliasUri = baseBackendUri & "_aliases"
 
@@ -72,24 +72,14 @@ type
     packageHomepage*: seq[string]
     packagePosition*: string
 
-  NixSearchRespOption* = object
-    `type`*: string
-    optionSource*: string
-    optionName*: string
-    optionDescription*: string
-    optionType*: string
-    optionDefault*: string
-    optionExample*: Option[string]
-    optionFlake*: Option[string] # TODO: Is this type correct?
+  NixSearchRespHit*[T] = object
+    score*: float
+    source*: T #NixSearchRespPackage
 
-  NixSearchRespHit[T] = object
-    score: float
-    source: T #NixSearchRespPackage
-
-  NixSearchResp[T] = object
-    took: int
-    timedOut: bool
-    hits: tuple[hits: seq[NixSearchRespHit[T]]] #tuple[hits: seq[NixSearchRespHit]]
+  NixSearchResp*[T] = object
+    took*: int
+    timedOut*: bool
+    hits*: tuple[hits: seq[NixSearchRespHit[T]]] #tuple[hits: seq[NixSearchRespHit]]
 
 
 proc renameHook*(v: var NixSearchRespHit, fieldName: var string) =
@@ -108,7 +98,7 @@ proc `==`(x, y: NixChannel): bool {.borrow.}
 proc `$`(x: NixChannel): string {.borrow.}
 
 
-proc encodeBasicAuth(username, password: string): string {.inline.} =
+proc encodeBasicAuth*(username, password: string): string {.inline.} =
   "Basic " & base64.encode(username & ":" & password)
 
 proc fetchNixosSearchAliases(): HashSet[string] =
@@ -119,7 +109,7 @@ proc fetchNixosSearchAliases(): HashSet[string] =
     if data.aliases.len() > 0:
       result.incl(data.aliases.keys().toSeq().filterIt("nixos" in it).toHashSet())
 
-proc makeBackendSearchUri(self: NixSearchClient, channel: NixChannel): string {.inline.} =
+proc makeBackendSearchUri*(self: NixSearchClient, channel: NixChannel): string {.inline.} =
   doAssert channel in self.knownChannels
   baseBackendUri & self.searchPrefix & "nixos-" & $channel & "/_search"
 
@@ -136,7 +126,7 @@ proc newNixSearchClient*(): NixSearchClient =
   result.knownChannels = channels
 
 
-proc prepQuery(query: NixSearchQuery): NixSearchQueryJson =
+proc prepQuery*(query: NixSearchQuery): NixSearchQueryJson =
   result.size = query.maxResults
   if query.kind == SearchKind.package:
     result.sort = @[{
@@ -183,48 +173,3 @@ proc queryPackages*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearch
     if hit.source.`type` != "package":
       continue
     result.add(hit.source)
-
-
-proc queryOptions*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchRespOption] =
-  let preppedQuery = query.prepQuery().toJson()
-
-  var headers: HttpHeaders
-  headers["Authorization"] = encodeBasicAuth(elasticSearchUsername, elasticSearchPassword)
-  headers["Content-type"] = "application/json"
-  let resp = post(
-    self.makeBackendSearchUri(query.channel.get("unstable".NixChannel)),
-    headers,
-    preppedQuery,
-  )
-
-  let respData = resp.body.fromJson(NixSearchResp[NixSearchRespOption])
-  for hit in respData.hits.hits:
-    if hit.source.`type` != "option":
-      continue
-    var source = hit.source
-    # TODO: This is nasty
-    source.optionDescription = source.optionDescription.parseHtml().innerText().splitLines().join(" ")
-    result.add(source)
-
-
-when isMainModule:
-  let client = newNixSearchClient()
-  let query = NixSearchQuery(
-    maxResults : 50,
-    search : some MatchSearch(
-      search : "mullvad",
-    ),
-    kind : SearchKind.option
-  )
-
-  let packages = client.queryOptions(query)
-  #quit(0)
-  var i = packages.len()
-  for package in packages.reversed():
-    #echo "  ", i, " ", package.packageAttrName
-    #echo "    ", package.packageDescription
-    echo "  ", i, " ", package.optionName
-    echo "     ", package.optionDescription.parseHtml().innerText.splitLines().join(" ")
-    dec i
-
-  #echo client.backendSearchUri()

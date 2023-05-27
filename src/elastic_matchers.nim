@@ -8,12 +8,18 @@ import jsony
 
 
 type
+  SearchKind* {.pure.} = enum
+    package
+    option
+
   MatchName* = object
     name*: string
     exact*: bool
+    kind*: SearchKind
 
   MatchSearch* = object
     search*: string
+    kind*: SearchKind
 
 
 proc quoted(x: string): string {.inline.} =
@@ -95,24 +101,39 @@ proc dumpHook*(s: var string, v: MatchSearch) =
               addJsonVal("operator", "and")
               addJsonVal("_name", "multi_match_" & v.search.replace(" ", "_"))
               withJsonArray("fields"):
-                addJsonArrayVal("package_attr_name^9")
-                addJsonArrayVal("package_attr_name.*^5.3999999999999995")
-                addJsonArrayVal("package_programs^9")
-                addJsonArrayVal("package_programs.*^5.3999999999999995")
-                addJsonArrayVal("package_pname^6")
-                addJsonArrayVal("package_pname.*^3.5999999999999996")
-                addJsonArrayVal("package_description^1.3")
-                addJsonArrayVal("package_description.*^0.78")
-                addJsonArrayVal("package_pversion^1.3")
-                addJsonArrayVal("package_pversion.*^0.78")
-                addJsonArrayVal("package_longDescription^1")
-                addJsonArrayVal("package_longDescription.*^0.6")
+                if v.kind == SearchKind.package:
+                  addJsonArrayVal("package_attr_name^9")
+                  addJsonArrayVal("package_attr_name.*^5.3999999999999995")
+                  addJsonArrayVal("package_programs^9")
+                  addJsonArrayVal("package_programs.*^5.3999999999999995")
+                  addJsonArrayVal("package_pname^6")
+                  addJsonArrayVal("package_pname.*^3.5999999999999996")
+                  addJsonArrayVal("package_description^1.3")
+                  addJsonArrayVal("package_description.*^0.78")
+                  addJsonArrayVal("package_pversion^1.3")
+                  addJsonArrayVal("package_pversion.*^0.78")
+                  addJsonArrayVal("package_longDescription^1")
+                  addJsonArrayVal("package_longDescription.*^0.6")
+                elif v.kind == SearchKind.option:
+                  addJsonArrayVal("option_name^6")
+                  addJsonArrayVal("option_name.*^3.5999999999999996")
+                  addJsonArrayVal("option_description^1")
+                  addJsonArrayVal("option_description.*^0.6")
+                else:
+                  raise newException(ValueError, "Unhandled SearchKind = " & $v.kind)
                 addJsonArrayVal("flake_name^0.5")
                 addJsonArrayVal("flake_name.*^0.3")
-                addJsonArrayVal("flake_resolved.*^99")
+                #addJsonArrayVal("flake_resolved.*^99")
           withJsonObject:
             withJsonMap("wildcard"):
-              withJsonMap("package_attr_name"):
+              var wildcardName =
+                if v.kind == SearchKind.package:
+                  "package_attr_name"
+                elif v.kind == SearchKind.option:
+                  "option_name"
+                else:
+                  raise newException(ValueError, "Unhandled SearchKind = " & $v.kind)
+              withJsonMap(wildcardName):
                 addJsonVal("value", "*" & v.search & "*")
                 addJsonVal("case_insensitive", true)
 

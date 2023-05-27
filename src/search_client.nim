@@ -1,11 +1,14 @@
 import std/[
+  algorithm,
   base64,
   hashes,
+  htmlparser,
   options,
   sets,
   sequtils,
   strutils,
   tables,
+  xmltree,
 ]
 
 import puppy
@@ -42,6 +45,7 @@ type
     channel*: Option[NixChannel]
     name*: Option[MatchName]
     search*: Option[MatchSearch]
+    kind*: SearchKind
 
   NixSearchQueryJson = object
     `from`, size: int
@@ -68,14 +72,24 @@ type
     packageHomepage*: seq[string]
     packagePosition*: string
 
-  NixSearchRespHit = object
-    score: float
-    source: NixSearchRespPackage
+  NixSearchRespOption* = object
+    `type`*: string
+    optionSource*: string
+    optionName*: string
+    optionDescription*: string
+    optionType*: string
+    optionDefault*: string
+    optionExample*: Option[string]
+    optionFlake*: Option[string] # TODO: Is this type correct?
 
-  NixSearchResp = object
+  NixSearchRespHit[T] = object
+    score: float
+    source: T #NixSearchRespPackage
+
+  NixSearchResp[T] = object
     took: int
     timedOut: bool
-    hits: tuple[hits: seq[NixSearchRespHit]]
+    hits: tuple[hits: seq[NixSearchRespHit[T]]] #tuple[hits: seq[NixSearchRespHit]]
 
 
 proc renameHook*(v: var NixSearchRespHit, fieldName: var string) =
@@ -124,17 +138,29 @@ proc newNixSearchClient*(): NixSearchClient =
 
 proc prepQuery(query: NixSearchQuery): NixSearchQueryJson =
   result.size = query.maxResults
-  result.sort = @[{
-    "_score": "desc",
-    "package_attr_name": "desc",
-    "package_pversion": "desc",
-  }.toOrderedTable()]
+  if query.kind == SearchKind.package:
+    result.sort = @[{
+      "_score": "desc",
+      "package_attr_name": "desc",
+      "package_pversion": "desc",
+    }.toOrderedTable()]
+  elif query.kind == SearchKind.option:
+    result.sort = @[{
+      "_score": "desc",
+      "option_name": "desc",
+    }.toOrderedTable()]
+  else:
+    raise newException(ValueError, "Unhandled SearchKind = " & $query.kind)
 
   var must = newSeq[RawJson]()
   if query.name.isSome():
-    must.add(query.name.toJson().RawJson)
+    var q = query.name.unsafeGet()
+    q.kind = query.kind
+    must.add(q.toJson().RawJson)
   if query.search.isSome():
-    must.add(query.search.toJson().RawJson)
+    var q = query.search.unsafeGet()
+    q.kind = query.kind
+    must.add(q.toJson().RawJson)
 
   result.query["bool"] = {
     "must": must.toJson().RawJson
@@ -152,25 +178,53 @@ proc queryPackages*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearch
     preppedQuery,
   )
 
-  let respData = resp.body.fromJson(NixSearchResp)
+  let respData = resp.body.fromJson(NixSearchResp[NixSearchRespPackage])
   for hit in respData.hits.hits:
     if hit.source.`type` != "package":
       continue
     result.add(hit.source)
 
 
+proc queryOptions*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchRespOption] =
+  let preppedQuery = query.prepQuery().toJson()
+
+  var headers: HttpHeaders
+  headers["Authorization"] = encodeBasicAuth(elasticSearchUsername, elasticSearchPassword)
+  headers["Content-type"] = "application/json"
+  let resp = post(
+    self.makeBackendSearchUri(query.channel.get("unstable".NixChannel)),
+    headers,
+    preppedQuery,
+  )
+
+  let respData = resp.body.fromJson(NixSearchResp[NixSearchRespOption])
+  for hit in respData.hits.hits:
+    if hit.source.`type` != "option":
+      continue
+    var source = hit.source
+    # TODO: This is nasty
+    source.optionDescription = source.optionDescription.parseHtml().innerText().splitLines().join(" ")
+    result.add(source)
+
+
 when isMainModule:
   let client = newNixSearchClient()
   let query = NixSearchQuery(
     maxResults : 50,
-    search : some MatchSearch(search : "python")
+    search : some MatchSearch(
+      search : "mullvad",
+    ),
+    kind : SearchKind.option
   )
 
-  let packages = client.queryPackages(query)
+  let packages = client.queryOptions(query)
+  #quit(0)
   var i = packages.len()
-  for package in packages:
-    echo "  ", i, " ", package.packageAttrName
-    echo "    ", package.packageDescription
+  for package in packages.reversed():
+    #echo "  ", i, " ", package.packageAttrName
+    #echo "    ", package.packageDescription
+    echo "  ", i, " ", package.optionName
+    echo "     ", package.optionDescription.parseHtml().innerText.splitLines().join(" ")
     dec i
 
   #echo client.backendSearchUri()

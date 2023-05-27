@@ -10,6 +10,7 @@ import jsony
 type
   MatchName* = object
     name*: string
+    exact*: bool
 
   MatchSearch* = object
     search*: string
@@ -64,15 +65,20 @@ proc dumpHook*(s: var string, v: MatchName) =
       withJsonMap("dis_max"):
         addJsonVal("tie_breaker", 0.7)
         withJsonArray("queries"):
-          # TODO: Why does it make the order so weird
-          withJsonObject:
-            withJsonMap("wildcard"):
-              withJsonMap("package_attr_name"):
-                addJsonVal("value", v.name & "*")
-                addJsonVal("case_insensitive", true)
-          withJsonObject:
-            withJsonMap("match"):
-              addJsonVal("package_programs", v.name)
+          if v.exact:
+            withJsonObject:
+              withJsonMap("term"):
+                addJsonVal("package_attr_name", v.name)
+          else:
+            # TODO: Why does it make the order so weird
+            withJsonObject:
+              withJsonMap("wildcard"):
+                withJsonMap("package_attr_name"):
+                  addJsonVal("value", v.name & "*")
+                  addJsonVal("case_insensitive", true)
+            withJsonObject:
+              withJsonMap("match"):
+                addJsonVal("package_programs", v.name)
 
 proc dumpHook*(s: var string, v: MatchSearch) =
   buildJson:

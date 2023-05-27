@@ -124,7 +124,7 @@ proc install(progNames: seq[string], multi=false) =
         NixSearchQuery(
           maxResults : 1,
           # TODO: Use other search option
-          search : some MatchSearch(search : progName)
+          name : some MatchName(name : progName, exact : true)
         )
       )
       if webPackages.len() == 0:

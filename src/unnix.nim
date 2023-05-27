@@ -99,20 +99,25 @@ template pkgWrapNix(installedPkgs, body: untyped): untyped =
   )
   body
 
+proc readUserYNResp(defaultInput="y"): bool =
+  var resp = stdin.readLine().strip()
+  if resp.len() == 0:
+    resp = defaultInput
+  while resp[0] notin { 'y', 'n' }:
+    resp = stdin.readLine().strip()
+    if resp.len() == 0:
+      resp = defaultInput
+  resp == "y"
+
 template wrapUnfreeNixCommand(package: NixSearchRespPackage, body: untyped) =
   let pkg = package
   if pkg.isUnfree():
     stdout.write(pkg.packageAttrName & " is unfree. Do you want to let nix continue? (Y/n) ")
-    var resp = stdin.readLine().strip()
-    if resp.len() == 0:
-      resp = "y"
-    while resp[0] notin { 'y', 'n' }:
-      resp = stdin.readLine().strip()
-    if resp[0] == 'n':
-      echo "Cancelled " & pkg.packageAttrName & ""
-      return
-    else:
+    if readUserYNResp():
       echo "Continuing..."
+    else:
+      echo "Cancelled " & pkg.packageAttrName
+      return
   body
 
 
@@ -128,7 +133,6 @@ proc install(progNames: seq[string]) =
       let webPackages = client.queryPackages(
         NixSearchQuery(
           maxResults : 1,
-          # TODO: Use other search option
           name : some MatchName(name : progName, exact : true)
         )
       )

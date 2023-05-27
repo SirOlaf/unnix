@@ -1,12 +1,10 @@
 import std/[
-  algorithm,
   base64,
   hashes,
   options,
   sets,
   sequtils,
   strutils,
-  sugar,
   tables,
 ]
 

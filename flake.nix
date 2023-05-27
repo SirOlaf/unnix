@@ -8,9 +8,11 @@
   outputs = { self, nixpkgs }:
   {
     packages.x86_64-linux.unnix =
-      let pkgs = import nixpkgs {
-        system = "x86_64-linux";
-      };
+      let
+        pkgs = import nixpkgs {
+          system = "x86_64-linux";
+        };
+        stuff = import ./stuff.nix {};
       in
       pkgs.stdenv.mkDerivation rec {
         name = "unnix";
@@ -19,8 +21,8 @@
 
         configurePhase = "";
         
-        buildInputs = with pkgs; [ nim ];
-        buildPhase = "nim c -d:release --nimcache:cache src/unnix.nim";
+        buildInputs = with pkgs; [ nim curl ];
+        buildPhase = "nim c -d:release --nimcache:cache --skipUserCfg:on --skipParentCfg:on --noNimblePath ${stuff.nimPathArgs} src/unnix.nim";
 
         installPhase = "
           mkdir -p $out/bin

@@ -1,4 +1,4 @@
-{ fetchGit }:
+{ ... }:
 rec {
   puppy = {
     pname = "puppy";

@@ -5,7 +5,6 @@ import std/[
   strutils,
   sequtils,
   sets,
-
   posix,
 ]
 
@@ -100,8 +99,10 @@ template pkgWrapNix(installedPkgs, body: untyped): untyped =
 template wrapUnfreeNixCommand(package: NixSearchRespPackage, body: untyped) =
   let pkg = package
   if pkg.isUnfree():
-    stdout.write(pkg.packageAttrName & " is unfree. Do you want to let nix continue? (y/n) ")
+    stdout.write(pkg.packageAttrName & " is unfree. Do you want to let nix continue? (Y/n) ")
     var resp = stdin.readLine().strip()
+    if resp.len() == 0:
+      resp = "y"
     while resp[0] notin { 'y', 'n' }:
       resp = stdin.readLine().strip()
     if resp[0] == 'n':
@@ -112,27 +113,55 @@ template wrapUnfreeNixCommand(package: NixSearchRespPackage, body: untyped) =
   body
 
 
-proc doInstall(progName: string) =
-  var curProgs = loadSimplePrograms()
+proc install(progNames: seq[string], multi=false) =
+  let prevProgs = loadSimplePrograms()
+  var curProgs = prevProgs
 
-  pkgWrapNix(some curProgs):
-    for package in selectedPackages:
-      curProgs.incl(package.packageAttrName)
-  curProgs.writeSimpleProgramFile()
-  doNixosRebuild()
+  if multi:
+    for progName in progNames:
+      var client = newNixSearchClient()
+      let webPackages = client.queryPackages(
+        NixSearchQuery(
+          maxResults : 1,
+          # TODO: Use other search option
+          search : some MatchSearch(search : progName)
+        )
+      )
+      if webPackages.len() == 0:
+        echo "Could not find package " & progName
+        curProgs = prevProgs
+        break
+      curProgs.incl(progName)
+  else:
+    let progName = progNames[0]
+
+    pkgWrapNix(some curProgs):
+      for package in selectedPackages:
+        curProgs.incl(package.packageAttrName)
+  if curProgs != prevProgs:
+    curProgs.writeSimpleProgramFile()
+    doNixosRebuild()
 
 
-proc doUninstall(progName: string) =
-  var curProgs = loadSimplePrograms()
-  if progName notin curProgs:
-    echo progName & " isn't installed!"
-    return
+proc uninstall(progNames: seq[string]) =
+  let prevProgs = loadSimplePrograms()
+  var curProgs = prevProgs
 
-  curProgs.excl(progName)
-  curProgs.writeSimpleProgramFile()
-  doNixosRebuild()
+  for progName in progNames:
+    if progName notin curProgs:
+      echo progName & " isn't installed!"
+      if progNames.len() == 1:
+        return
 
-proc doShell(progName: string) =
+    curProgs.excl(progName)
+  if curProgs != prevProgs:
+    curProgs.writeSimpleProgramFile()
+    doNixosRebuild()
+
+proc shell(progName: seq[string]) =
+  doAssert progName.len() == 1
+  # TODO: Handle multishell
+  var progName = progName[0]
   pkgWrapNix(none HashSet[string]):
     for package in selectedPackages:
       wrapUnfreeNixCommand(package):
@@ -141,7 +170,10 @@ proc doShell(progName: string) =
         else:
           discard os.execShellCmd("nix shell nixpkgs#" & package.packageAttrName)
 
-proc doRun(progName: string) =
+proc run(progName: seq[string]) =
+  # TODO: Find better way to forbid multirun
+  doAssert progName.len() == 1
+  var progname = progName[0]
   pkgWrapNix(none HashSet[string]):
     doAssert selectedPackages.len() == 1
     wrapUnfreeNixCommand(selectedPackages[0]):
@@ -151,25 +183,14 @@ proc doRun(progName: string) =
         discard os.execShellCmd("nix run nixpkgs#" & selectedPackages[0].packageAttrName)
 
 
-proc main() =
-  #if not isRoot():
-  #  echo "This needs to be run as root for now"
-  #  return
-
-  # TODO: Use parseopt or something for cli
-  let modeStr = paramStr(1)
-  case modeStr
-  of "install":
-    doInstall(paramStr(2).toLower())
-  of "uninstall":
-    doUninstall(paramStr(2).toLower())
-  of "shell":
-    doShell(paramStr(2).toLower())
-  of "run":
-    doRun(paramStr(2).toLower())
-
-
 when isMainModule:
-  main()
+  import cligen
+  dispatchMulti(
+    [install],
+    [uninstall],
+    [shell],
+    [run]
+  )
+  #main()
   #let progs = loadSimplePrograms()
   #echo progs.buildSimpleProgramFile()

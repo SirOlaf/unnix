@@ -15,3 +15,5 @@ requires "nim >= 1.6.12"
 requires "puppy@#head"
 
 requires "jsony@#head"
+
+requires "cligen#head"

@@ -16,6 +16,14 @@ rec {
       rev = "4fa3a9b52649e31783ab2165b5476d5737c8842c";
     };
   };
+  cligen = {
+    pname = "cligen";
+    version = "446ecbf46ebc610b0a8f96ede2d505176b8c2e21";
+    src = fetchGit {
+      url = "https://github.com/c-blake/cligen";
+      rev = "446ecbf46ebc610b0a8f96ede2d505176b8c2e21";
+    };
+  };
   libcurl = {
     pname = "libcurl";
     version = "23f3d90e60d7a233b5eb27fb13e57fd198c73697";
@@ -26,10 +34,10 @@ rec {
   };
   zippy = {
     pname = "zippy";
-    version = "a3fd6f0458ffdd7cbbd416be99f2ca80a7852d82";
+    version = "614e3462a3667194a7cb08ea7468d17cd6efd7ae";
     src = fetchGit {
       url = "https://github.com/guzba/zippy";
-      rev = "a3fd6f0458ffdd7cbbd416be99f2ca80a7852d82";
+      rev = "614e3462a3667194a7cb08ea7468d17cd6efd7ae";
     };
   };
   webby = {
@@ -40,5 +48,5 @@ rec {
       rev = "7796159f4e6875ffa6a6a0980af931ad918eb4e8";
     };
   };
-  nimPathArgs = "--path:\"${puppy.src}/src\" --path:\"${jsony.src}/src\" --path:\"${libcurl.src}\" --path:\"${zippy.src}/src\" --path:\"${webby.src}/src\"";
+  nimPathArgs = "--path:\"${puppy.src}/src\" --path:\"${jsony.src}/src\" --path:\"${cligen.src}\" --path:\"${libcurl.src}\" --path:\"${zippy.src}/src\" --path:\"${webby.src}/src\"";
 }

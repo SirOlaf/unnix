@@ -113,11 +113,13 @@ template wrapUnfreeNixCommand(package: NixSearchRespPackage, body: untyped) =
   body
 
 
-proc install(progNames: seq[string], multi=false) =
+proc install(progNames: seq[string]) =
   let prevProgs = loadSimplePrograms()
   var curProgs = prevProgs
 
-  if multi:
+  doAssert progNames.len() >= 1
+
+  if progNames.len() > 1:
     for progName in progNames:
       var client = newNixSearchClient()
       let webPackages = client.queryPackages(
@@ -133,7 +135,6 @@ proc install(progNames: seq[string], multi=false) =
         break
       curProgs.incl(progName)
   else:
-    doAssert progNames.len() == 1
     let progName = progNames[0]
 
     pkgWrapNix(some curProgs):

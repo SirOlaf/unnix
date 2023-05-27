@@ -68,11 +68,14 @@ proc presentPackage(package: NixSearchRespPackage, packageIdx: int, installedPac
   echo ""
   echo "    ", package.packageDescription
 
-proc doPackageSelect(packages: seq[NixSearchRespPackage], highlightInstalled: bool, installedPackages=none(HashSet[string])): seq[NixSearchRespPackage] =
+proc presentPackages(packages: seq[NixSearchRespPackage], highlightInstalled: bool, installedPackages=none(HashSet[string])) =
   var idx = packages.len()
   for package in packages.reversed():
     presentPackage(package, idx, installedPackages.get(initHashSet[string]()))
     dec idx
+
+proc doPackageSelect(packages: seq[NixSearchRespPackage], highlightInstalled: bool, installedPackages=none(HashSet[string])): seq[NixSearchRespPackage] =
+  presentPackages(packages, highlightInstalled, installedPackages)
 
   stdout.write ":: "
   # TODO: Allow stuff like ranges and handle bad input so we don't just crash
@@ -184,6 +187,22 @@ proc run(progName: seq[string]) =
       else:
         discard os.execShellCmd("nix run nixpkgs#" & selectedPackages[0].packageAttrName)
 
+proc search(progName: seq[string]) =
+  doAssert progName.len() == 1
+  let installedProgs = loadSimplePrograms()
+  var client = newNixSearchClient()
+  let webPackages = client.queryPackages(
+    NixSearchQuery(
+      maxResults : 10,
+      search : some MatchSearch(search : progName[0])
+    )
+  )
+  presentPackages(
+    packages = webPackages,
+    highlightInstalled = true, 
+    installedPackages = some installedProgs
+  )
+
 
 when isMainModule:
   import cligen
@@ -191,7 +210,8 @@ when isMainModule:
     [install],
     [uninstall],
     [shell],
-    [run]
+    [run],
+    [search],
   )
   #main()
   #let progs = loadSimplePrograms()

@@ -19,15 +19,17 @@ proc isUnfree(package: NixSearchRespPackage): bool {.inline.} =
   package.packageLicense.anyIt(it.fullName == "Unfree")
 
 
-proc getSimpleProgramsPath(): string {.inline.} =
+proc getSimpleProgramsPath(required = true): string {.inline.} =
   result = getEnv("UNNIX_SIMPLE_PROGRAMS")
-  if result == "":
+  if result == "" and required:
     echo "You may have forgotten to set the UNNIX_SIMPLE_PROGRAMS environment variable"
     quit(0)
 
 
-proc loadSimplePrograms(): HashSet[string] =
-  if fileExists(getSimpleProgramsPath()):
+proc loadSimplePrograms(requireProgfile = true): HashSet[string] =
+  let progPath = getSimpleProgramsPath(requireProgfile).strip()
+
+  if progPath.len() > 0 and fileExists(progPath):
     let
       contents = readFile(getSimpleProgramsPath())
       progStart = contents.find("[")
@@ -193,7 +195,7 @@ proc run(progName: seq[string]) =
 
 proc search(progName: seq[string]) =
   doAssert progName.len() == 1
-  #let installedProgs = loadSimplePrograms()
+  let installedProgs = loadSimplePrograms(requireProgfile=false)
   var client = newNixSearchClient()
   let webPackages = client.queryPackages(
     NixSearchQuery(
@@ -204,7 +206,7 @@ proc search(progName: seq[string]) =
   presentPackages(
     packages = webPackages,
     highlightInstalled = true, 
-    #installedPackages = some installedProgs
+    installedPackages = some installedProgs
   )
 
 

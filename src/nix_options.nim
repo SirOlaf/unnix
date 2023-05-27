@@ -46,6 +46,9 @@ proc queryOptions*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchR
     source.optionDescription = source.optionDescription.parseHtml().innerText().splitLines().join(" ")
     result.add(source)
 
+
+
+
 when isMainModule:
   let client = newNixSearchClient()
   let query = NixSearchQuery(

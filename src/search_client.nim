@@ -52,34 +52,14 @@ type
     sort: seq[OrderedTable[string, string]]
     query: OrderedTable[string, OrderedTable[string, RawJson]]
 
-
-  NixSearchRespLicense* = object
-    url*: string
-    fullName*: string
-
-  NixSearchRespPackage* = object
-    `type`*: string
-    packageAttrName*: string
-    packageAttrSet*: string
-    packagePname*: string
-    packagePversion*: string
-    packagePlatforms*: seq[string]
-    packageOutputs*: seq[string]
-    packagePrograms*: seq[string]
-    packageLicense*: seq[NixSearchRespLicense]
-    packageDescription*: string
-    packageSystem*: string
-    packageHomepage*: seq[string]
-    packagePosition*: string
-
   NixSearchRespHit*[T] = object
     score*: float
-    source*: T #NixSearchRespPackage
+    source*: T
 
   NixSearchResp*[T] = object
     took*: int
     timedOut*: bool
-    hits*: tuple[hits: seq[NixSearchRespHit[T]]] #tuple[hits: seq[NixSearchRespHit]]
+    hits*: tuple[hits: seq[NixSearchRespHit[T]]]
 
 
 proc renameHook*(v: var NixSearchRespHit, fieldName: var string) =
@@ -156,20 +136,3 @@ proc prepQuery*(query: NixSearchQuery): NixSearchQueryJson =
     "must": must.toJson().RawJson
   }.toOrderedTable()
 
-proc queryPackages*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchRespPackage] =
-  let preppedQuery = query.prepQuery().toJson()
-
-  var headers: HttpHeaders
-  headers["Authorization"] = encodeBasicAuth(elasticSearchUsername, elasticSearchPassword)
-  headers["Content-type"] = "application/json"
-  let resp = post(
-    self.makeBackendSearchUri(query.channel.get("unstable".NixChannel)),
-    headers,
-    preppedQuery,
-  )
-
-  let respData = resp.body.fromJson(NixSearchResp[NixSearchRespPackage])
-  for hit in respData.hits.hits:
-    if hit.source.`type` != "package":
-      continue
-    result.add(hit.source)

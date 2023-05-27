@@ -9,6 +9,7 @@ import std/[
 ]
 
 import search_client
+import nix_packages
 import elastic_matchers
 
 

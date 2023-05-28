@@ -83,6 +83,7 @@ proc presentOption(option: NixSearchRespOption, optionIdx: int, simpleMode=true)
     stdout.write "  ", optionIdx, " ", option.optionName, ": ", option.optionType, " (default=", option.optionDefault, ")"
     echo ""
     echo "    ", option.optionDescription
+    #echo "    ", option.optionExample
   else:
     discard
 

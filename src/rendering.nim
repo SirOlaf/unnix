@@ -31,7 +31,7 @@ proc initInteractiveTableState*(x, y: int, maxColumnWidth: int, height: int, ful
   result.columnWidths = newSeq[int](result.columns)
   result.columnPositions = newSeq[int](result.columns)
   for row in result.fullData:
-    for i in 0 ..< row.len():
+    for i in 0 ..< result.columns:
       let col = row[i].len() + 1
       if col <= maxColumnWidth and col > result.columnWidths[i]:
         result.columnWidths[i] = col

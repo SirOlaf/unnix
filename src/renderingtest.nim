@@ -14,7 +14,7 @@ var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
 
 tb.setForegroundColor(fgBlack, true)
 
-tb.drawTable(0, 0, 4, 100, 5, 5, @[
+let testData = @[
   @[
     "name", "type", "default", "description"
   ],
@@ -27,8 +27,30 @@ tb.drawTable(0, 0, 4, 100, 5, 5, @[
   @[
     "service.mullvad.enable", "boolean", "false", "This option enables Mullvad VPN daemon. This sets networking.firewall.checkReversePath to “loose”, which might be undesirable for security."
   ],
-])
+]
 
+
+var table = initInteractiveTableState(
+  x = 0, y = 0,
+  maxColumnWidth = 70,
+  height = tb.height,
+  fullData = testData
+)
+
+
+var selectedRow = 0
 while true:
+  var key = getKey()
+  case key
+  of Key.Up: dec selectedRow
+  of Key.Down: inc selectedRow
+  else:
+    discard
+
+  selectedRow = clamp(selectedRow, 1, 3)
+  table.hoveredRow = selectedRow
+
+  tb.drawInteractiveTable(table)
+
   tb.display()
   sleep(20)

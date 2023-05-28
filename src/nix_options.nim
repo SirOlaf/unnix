@@ -53,7 +53,7 @@ proc queryOptions*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchR
     source.optionDefault = source.optionDefault.squashHtml()
     result.add(source)
   for i in 0 ..< result.len():
-    if ".enable" in result[i].optionName:
+    if result[i].optionName.endsWith(".enable"):
       let val = result[i]
       result.delete(i)
       result = @[val] & result

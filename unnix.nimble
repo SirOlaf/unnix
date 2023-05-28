@@ -17,3 +17,5 @@ requires "puppy@#head"
 requires "jsony@#head"
 
 requires "cligen#head"
+
+requires "illwill#head"

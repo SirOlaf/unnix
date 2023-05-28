@@ -24,6 +24,14 @@ rec {
       rev = "446ecbf46ebc610b0a8f96ede2d505176b8c2e21";
     };
   };
+  illwill = {
+    pname = "illwill";
+    version = "4cab69806f02c954b5712686f60b183aa1dcb7d5";
+    src = fetchGit {
+      url = "https://github.com/johnnovak/illwill";
+      rev = "4cab69806f02c954b5712686f60b183aa1dcb7d5";
+    };
+  };
   libcurl = {
     pname = "libcurl";
     version = "23f3d90e60d7a233b5eb27fb13e57fd198c73697";
@@ -48,5 +56,5 @@ rec {
       rev = "7796159f4e6875ffa6a6a0980af931ad918eb4e8";
     };
   };
-  nimPathArgs = "--path:\"${puppy.src}/src\" --path:\"${jsony.src}/src\" --path:\"${cligen.src}\" --path:\"${libcurl.src}\" --path:\"${zippy.src}/src\" --path:\"${webby.src}/src\"";
+  nimPathArgs = "--path:\"${puppy.src}/src\" --path:\"${jsony.src}/src\" --path:\"${cligen.src}\" --path:\"${illwill.src}\" --path:\"${libcurl.src}\" --path:\"${zippy.src}/src\" --path:\"${webby.src}/src\"";
 }

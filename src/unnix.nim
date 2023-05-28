@@ -78,15 +78,18 @@ proc presentPackages(packages: seq[NixSearchRespPackage], highlightInstalled: bo
     dec idx
 
 
-proc presentOption(option: NixSearchRespOption, optionIdx: int) =
-  stdout.write "  ", optionIdx, " ", option.optionName, ": ", option.optionType, " (default=", option.optionDefault, ")"
-  echo ""
-  echo "    ", option.optionDescription
+proc presentOption(option: NixSearchRespOption, optionIdx: int, simpleMode=true) =
+  if simpleMode:
+    stdout.write "  ", optionIdx, " ", option.optionName, ": ", option.optionType, " (default=", option.optionDefault, ")"
+    echo ""
+    echo "    ", option.optionDescription
+  else:
+    discard
 
-proc presentOptions(options: seq[NixSearchRespOption]) =
+proc presentOptions(options: seq[NixSearchRespOption], simpleMode=true) =
   var idx = options.len()
   for option in options.reversed():
-    presentOption(option, idx)
+    presentOption(option, idx, simpleMode)
     dec idx
 
 
@@ -219,7 +222,8 @@ proc search(progName: seq[string], options=false) =
       )
     )
     presentOptions(
-      options = webOptions
+      options = webOptions,
+      simpleMode = true # TODO: Add a way to configure simple mode which doesn't rely on illwill
     )
   else:
     let installedProgs = loadSimplePrograms(requireProgfile=false)

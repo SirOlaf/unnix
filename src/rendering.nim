@@ -1,7 +1,7 @@
 import illwill
 
 
-proc exitIllwill*() =
+proc exitIllwill*() {.noconv.} =
   illwillDeinit()
   showCursor()
 
@@ -19,7 +19,9 @@ type
     hoveredRow*: int
     columnWidths*: seq[int]
     columnPositions*: seq[int]
-    onHover*: proc(self: var InteractiveTableState, tb: var TerminalBuffer) {.nimcall.}
+    onHover*: proc(self: var InteractiveTableState, tb: var TerminalBuffer) {.closure.}
+    loadRowStyle*: proc(self: InteractiveTableState, rowIdx: int, tb: var TerminalBuffer) {.closure.}
+    loadValueStyle*: proc(self: InteractiveTableState, rowIdx: int, columnIdx: int, tb: var TerminalBuffer) {.closure.}
 
 
 proc initInteractiveTableState*(x, y: int, maxColumnWidth: int, height: int, fullData: seq[seq[string]]): InteractiveTableState =
@@ -49,8 +51,8 @@ proc initInteractiveTableState*(x, y: int, maxColumnWidth: int, height: int, ful
 
 
 proc drawInteractiveTable*(tb: var TerminalBuffer, state: var InteractiveTableState) =
-  let oldFG = tb.getForegroundColor()
   tb.setForegroundColor(fgWhite, false)
+  tb.setStyle({ Style.styleDim })
   var bb = newBoxBuffer(state.width + 1, state.height)
   for x in state.columnPositions:
     bb.drawVertLine(
@@ -60,17 +62,16 @@ proc drawInteractiveTable*(tb: var TerminalBuffer, state: var InteractiveTableSt
 
   bb.drawHorizLine(state.posX, state.posX+state.width, state.posY+1, connect=true)
   tb.write(bb)
-  tb.setForegroundColor(oldFG, false)
 
   for y in 0 ..< state.fullData.len():
-    let oldFG = tb.getForegroundColor()
-    if y == state.hoveredRow:
-      tb.setForegroundColor(fgWhite, true)
+    if state.loadRowStyle != nil:
+      state.loadRowStyle(state, y, tb)
     let row = state.fullData[y]
     for x in 0 ..< state.columns:
       let val = row[x]
+      if state.loadValueStyle != nil:
+        state.loadValueStyle(state, y, x, tb)
       tb.write(state.posX + state.columnPositions[x] + 1, state.posY + y + (if y == 0: 0 else: 1), val[0 ..< min(val.len(), state.columnWidths[x] - 1)])
-    tb.setForegroundColor(oldFG, false)
     if state.onHover != nil:
       state.onHover(state, tb)
 

@@ -5,16 +5,15 @@ import std/[
   strutils,
   sequtils,
   sets,
-  posix,
 ]
+
+import illwill
 
 import nix_packages
 import nix_options
 import elastic_matchers
+import rendering
 
-
-proc isRoot(): bool {.inline.} =
-  getuid() == 0
 
 proc isUnfree(package: NixSearchRespPackage): bool {.inline.} =
   package.packageLicense.anyIt(it.fullName == "Unfree")
@@ -241,6 +240,117 @@ proc search(progName: seq[string], options=false) =
       installedPackages = some installedProgs
     )
 
+proc browse(optionName: seq[string]) =
+  ## interactive option browser, currently doesn't actually configure anything
+  doAssert optionName.len() == 1 # TODO: Improve
+  var client = newNixSearchClient()
+  let options = client.queryOptions(
+    NixSearchQuery(
+      maxResults : 10,
+      search : some MatchSearch(search : optionName[0]),
+      kind : SearchKind.option
+    )
+  )
+  var dataStore = options
+
+  var tableData = newSeq[seq[string]]()
+  tableData.add(@[
+    "name", "value", "type"
+  ])
+  for option in options:
+    var row = @[
+      option.optionName,
+      option.optionDefault, # TODO: read simple_options.nix and highlight changed values using loadValueStyle callback
+      option.optionType,
+    ]
+    tableData.add(row)
+
+  illwillInit()
+  setControlCHook(illwillExitProc)
+  hideCursor()
+  var tb = newTerminalBuffer(terminalWidth(), terminalHeight())
+  tb.setForegroundColor(fgBlack, true)
+
+  var table = initInteractiveTableState(
+    x = 0, y = 0,
+    maxColumnWidth = 50,
+    height = tb.height(),
+    fullData = tableData,
+  )
+
+  var
+    selectedRow = 0
+
+  proc onHover(self: var InteractiveTableState, tb: var TerminalBuffer) {.closure.} =
+    let
+      x = self.posX + self.width + 1
+      y = 1
+      width = tb.width() - x
+
+    let desc = options[self.hoveredRow - 1].optionDescription.split(" ")
+
+    var
+      chunks = newSeq[string]()
+      curChunk = ""
+    for part in desc:
+      if curChunk.len() + part.len() > width:
+        chunks.add(curChunk)
+        curChunk = ""
+      curChunk &= " " & part
+    if curChunk.len() > 0:
+      chunks.add(curChunk)
+
+    tb.setForegroundColor(fgWhite, false)
+    tb.setStyle({ Style.styleDim })
+
+    var yoff = 0
+    for chunk in chunks:
+      tb.write(x, y + yoff, chunk)
+      inc yoff
+
+  proc loadRowStyle(self: InteractiveTableState, rowIdx: int, tb: var TerminalBuffer) {.closure.} =
+    if rowIdx == self.hoveredRow:
+      tb.setForegroundColor(fgWhite, false)
+      tb.setStyle({ Style.styleBright })
+    else:
+      tb.setForegroundColor(fgWhite, false)
+      tb.setStyle({ Style.styleDim })
+
+  proc loadValueStyle(self: InteractiveTableState, rowIdx: int, columnIdx: int, tb: var TerminalBuffer) {.closure.} =
+    if rowIdx < 1:
+      return
+    if options[rowIdx - 1].optionDefault != dataStore[rowIdx - 1].optionDefault:
+      tb.setForegroundColor(fgGreen)
+      tb.setStyle({ Style.styleItalic, styleUnderscore } + tb.getStyle())
+    
+  table.onHover = onHover
+  table.loadRowStyle = loadRowStyle
+  table.loadValueStyle = loadValueStyle
+
+  while true:
+    var key = getKey()
+    case key
+    of Key.Up: dec selectedRow
+    of Key.Down: inc selectedRow
+    of Key.Enter:
+      let valType = options[table.hoveredRow - 1].optionType
+      if valType == "boolean":
+        # TODO: Add actual mechanism for editing data
+        let val = dataStore[table.hoveredRow - 1].optionDefault
+        dataStore[table.hoveredRow - 1].optionDefault = if val == "true": "false" else: "true"
+        table.fullData[table.hoveredRow][1] = dataStore[table.hoveredRow - 1].optionDefault
+    else: discard
+
+    tb.clear(" ")
+
+    selectedRow = clamp(selectedRow, 1, dataStore.len())
+    table.hoverRow(selectedRow)
+
+    tb.drawInteractiveTable(table)
+
+    tb.display()
+    sleep(20)
+
 
 when isMainModule:
   import cligen
@@ -250,6 +360,7 @@ when isMainModule:
     [shell],
     [run],
     [search],
+    [browse],
   )
   #main()
   #let progs = loadSimplePrograms()

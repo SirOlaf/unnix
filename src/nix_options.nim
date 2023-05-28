@@ -2,6 +2,7 @@ import std/[
   algorithm,
   htmlparser,
   options,
+  sequtils,
   strutils,
   xmltree,
 ]
@@ -39,15 +40,23 @@ proc queryOptions*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchR
     preppedQuery,
   )
 
+  template squashHtml(x): string =
+    # TODO: This is nasty
+    x.parseHtml().innerText().splitLines().mapIt(it.strip()).filterIt(it.len() > 0).join(" ")
+
   let respData = resp.body.fromJson(NixSearchResp[NixSearchRespOption])
   for hit in respData.hits.hits:
     if hit.source.`type` != "option":
       continue
     var source = hit.source
-    # TODO: This is nasty
-    source.optionDescription = source.optionDescription.parseHtml().innerText().splitLines().join(" ")
+    source.optionDescription = source.optionDescription.squashHtml()#.parseHtml().innerText().splitLines().join(" ")
+    source.optionDefault = source.optionDefault.squashHtml()
     result.add(source)
-
+  for i in 0 ..< result.len():
+    if ".enable" in result[i].optionName:
+      let val = result[i]
+      result.delete(i)
+      result = @[val] & result
 
 
 

@@ -44,6 +44,10 @@ proc queryOptions*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchR
     # TODO: This is nasty
     x.parseHtml().innerText().splitLines().mapIt(it.strip()).filterIt(it.len() > 0).join(" ")
 
+  var
+    enableOptions = newSeq[NixSearchRespOption]()
+    otherOptions = newSeq[NixSearchRespOption]()
+ 
   let respData = resp.body.fromJson(NixSearchResp[NixSearchRespOption])
   for hit in respData.hits.hits:
     if hit.source.`type` != "option":
@@ -51,12 +55,14 @@ proc queryOptions*(self: NixSearchClient, query: NixSearchQuery): seq[NixSearchR
     var source = hit.source
     source.optionDescription = source.optionDescription.squashHtml()#.parseHtml().innerText().splitLines().join(" ")
     source.optionDefault = source.optionDefault.squashHtml()
-    result.add(source)
-  for i in 0 ..< result.len():
-    if result[i].optionName.endsWith(".enable"):
-      let val = result[i]
-      result.delete(i)
-      result = @[val] & result
+    if source.optionName.endsWith(".enable"):
+      enableOptions.add(source)
+    else:
+      otherOptions.add(source)
+
+  enableOptions = enableOptions.sortedByIt(it.optionName)
+  otherOptions = otherOptions.sortedByIt(it.optionName)
+  result = enableOptions & otherOptions
 
 
 

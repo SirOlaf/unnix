@@ -2,7 +2,7 @@ import std/[
   algorithm,
   options,
   os,
-  strutils,
+  strutils, strformat,
   sequtils,
   sets,
 ]
@@ -251,6 +251,10 @@ proc browse(optionName: seq[string]) =
       kind : SearchKind.option
     )
   )
+  if options.len() == 0:
+    echo fmt"No options fitting '{optionName[0]}' found"
+    return
+
   var dataStore = options
 
   var tableData = newSeq[seq[string]]()
